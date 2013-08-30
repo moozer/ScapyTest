@@ -1,5 +1,5 @@
-# /bin/python
-#
+#!/usr/bin/env python
+
 # Before running this program, you may need to change stuff in IP tables
 # see: http://stackoverflow.com/questions/9058052/unwanted-rst-tcp-packet-with-scapy
 # command:
@@ -286,40 +286,9 @@ ServerName = "caesar.acc.umu.se"
 ServerPort = 80
 ServerFile = "/debian-cd/7.1.0/amd64/iso-cd/debian-7.1.0-amd64-netinst.iso"
 
-# ServerName = "uchp000"
-# ServerPort = 80
-# ServerFile = "/1seclog.csv"
-
-myTCP_client.graph()
+# include this if you want an overview of the state machine.
+#myTCP_client.graph()
 
 s = myTCP_client( ServerName, ServerPort, "GET %s HTTP/1.0\n\n" % ServerFile, debug=5)
 s.run()
-
-
-#.tcplink(Raw, ServerName, ServerPort, debug=5)
-#s.run()
-#s.send("GET %s HTTP/1.0\n\n" % ServerFile)
-#print "s.recv"
-#s.recv()
-#print "s.recv"
-#s.recv()
-
-# ServerName = "uchp000"
-# ServerPort = 80
-# ServerFile = "/1seclog.csv"
-# # 
-# # s = myTCP_client.tcplink(Raw, ServerName, ServerPort, debug=5)
-# # s.send("GET %s HTTP/1.0\r\n" % ServerFile)
-# # s.recv()
-# 
-# #ServerName = "192.168.100.146"
-# #ServerPort = 8000
-# #ServerFile = "/"
-# 
-# s = myTCP_client.tcplink(Raw, ServerName, ServerPort, debug=5)
-# s.send("GET %s HTTP/1.0\n\n" % ServerFile)
-# 
-# while True:
-#     a = s.recv()
-#     print a
 
