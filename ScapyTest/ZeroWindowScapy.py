@@ -10,109 +10,112 @@
 # 2. after 10 packages, start sending zerowindow tcp replies
 
 from scapy.all import *
+from scapy.layers.inet import TCP_client, TCP
 
 
 #############################
 # # Simple TCP client stack ##
 #############################
 
-class myTCP_client(Automaton):
+class myTCP_client(TCP_client):
     
     def parse_args(self, ip, port, request, *args, **kargs):
+#         self.request = request
+#         self.dst = iter(Net(ip)).next()
+#         self.dport = port
+#         self.sport = random.randrange(0, 2 ** 16)
+#         self.l4 = IP(dst=ip) / TCP(sport=self.sport, dport=self.dport, flags=0,
+#                                  seq=random.randrange(0, 2 ** 32))
+#         self.src = self.l4.src
+#         self.swin = self.l4[TCP].window
+#         self.dwin = 1
+#         self.rcvbuf = ""
+#         bpf = "host %s  and host %s and port %i and port %i" % (self.src,
+#                                                                 self.dst,
+#                                                                 self.sport,
+#                                                                 self.dport)
+# 
+# #        bpf=None
+#         Automaton.parse_args(self, filter=bpf, **kargs)
         self.request = request
-        self.dst = iter(Net(ip)).next()
-        self.dport = port
-        self.sport = random.randrange(0, 2 ** 16)
-        self.l4 = IP(dst=ip) / TCP(sport=self.sport, dport=self.dport, flags=0,
-                                 seq=random.randrange(0, 2 ** 32))
-        self.src = self.l4.src
-        self.swin = self.l4[TCP].window
-        self.dwin = 1
-        self.rcvbuf = ""
-        bpf = "host %s  and host %s and port %i and port %i" % (self.src,
-                                                                self.dst,
-                                                                self.sport,
-                                                                self.dport)
-
-#        bpf=None
-        Automaton.parse_args(self, filter=bpf, **kargs)
+        TCP_client.parse_args(self, ip, port, **kargs)
 
     
-    def master_filter(self, pkt):
-        return (IP in pkt and
-                pkt[IP].src == self.dst and
-                pkt[IP].dst == self.src and
-                TCP in pkt and
-                pkt[TCP].sport == self.dport and
-                pkt[TCP].dport == self.sport and
-                self.l4[TCP].seq >= pkt[TCP].ack and  # XXX: seq/ack 2^32 wrap up
-                ((self.l4[TCP].ack == 0) or (self.l4[TCP].ack <= pkt[TCP].seq <= self.l4[TCP].ack + self.swin)))
-
-
-    @ATMT.state(initial=1)
-    def START(self):
-        print "START"
-        pass
-
-    @ATMT.state()
-    def SYN_SENT(self):
-        print "SYN_SENT"
-        pass
-    
-    @ATMT.state()
-    def ESTABLISHED(self):
-        print "EST"
-        pass
-
-    @ATMT.state()
-    def LAST_ACK(self):
-        print "LAST_ACK"
-        pass
-
-    @ATMT.state(final=1)
-    def CLOSED(self):
-        print "CLOSED"
-        pass
-
-    
-    @ATMT.condition(START)
-    def connect(self):
-        print "START cond: connect"
-        raise self.SYN_SENT()
-    @ATMT.action(connect)
-    def send_syn(self):
-        print "START action: connect"
-        self.l4[TCP].flags = "S"
-        self.send(self.l4)
-        self.l4[TCP].seq += 1
-
-
-    @ATMT.receive_condition(SYN_SENT)
-    def synack_received(self, pkt):
-        print "SYN_SENT: cond: synack"
-        print pkt.summary()
-        if pkt[TCP].flags & 0x3f == 0x12:
-            raise self.ESTABLISHED().action_parameters(pkt)
-    @ATMT.action(synack_received)
-    def send_ack_of_synack(self, pkt):
-        print "SYN_SENT: action: send ack"
-        self.l4[TCP].ack = pkt[TCP].seq + 1
-        self.l4[TCP].flags = "A"
-        self.send(self.l4)
-
-    @ATMT.receive_condition(ESTABLISHED)
-    def incoming_data_received(self, pkt):
-        print "EST: cond: incoming data?"
-        print pkt.summary()
-        if not isinstance(pkt[TCP].payload, NoPayload) and not isinstance(pkt[TCP].payload, conf.padding_layer):
-#             print "TCP flags: ", pkt[TCP].flags
-#             if pkt[TCP].flags & 0x4: # RST
-#                 print "ESTABLISHED: RST received... did you update iptables?"
-#                 raise self.CLOSED().action_parameters(pkt)
-            
-            # else ok
-            raise self.ESTABLISHED().action_parameters(pkt)
-    @ATMT.action(incoming_data_received)
+#     def master_filter(self, pkt):
+#         return (IP in pkt and
+#                 pkt[IP].src == self.dst and
+#                 pkt[IP].dst == self.src and
+#                 TCP in pkt and
+#                 pkt[TCP].sport == self.dport and
+#                 pkt[TCP].dport == self.sport and
+#                 self.l4[TCP].seq >= pkt[TCP].ack and  # XXX: seq/ack 2^32 wrap up
+#                 ((self.l4[TCP].ack == 0) or (self.l4[TCP].ack <= pkt[TCP].seq <= self.l4[TCP].ack + self.swin)))
+# 
+# 
+#     @ATMT.state(initial=1)
+#     def START(self):
+#         print "START"
+#         pass
+# 
+#     @ATMT.state()
+#     def SYN_SENT(self):
+#         print "SYN_SENT"
+#         pass
+#     
+#     @ATMT.state()
+#     def ESTABLISHED(self):
+#         print "EST"
+#         pass
+# 
+#     @ATMT.state()
+#     def LAST_ACK(self):
+#         print "LAST_ACK"
+#         pass
+# 
+#     @ATMT.state(final=1)
+#     def CLOSED(self):
+#         print "CLOSED"
+#         pass
+# 
+#     
+#     @ATMT.condition(START)
+#     def connect(self):
+#         print "START cond: connect"
+#         raise self.SYN_SENT()
+#     @ATMT.action(connect)
+#     def send_syn(self):
+#         print "START action: connect"
+#         self.l4[TCP].flags = "S"
+#         self.send(self.l4)
+#         self.l4[TCP].seq += 1
+# 
+# 
+#     @ATMT.receive_condition(SYN_SENT)
+#     def synack_received(self, pkt):
+#         print "SYN_SENT: cond: synack"
+#         print pkt.summary()
+#         if pkt[TCP].flags & 0x3f == 0x12:
+#             raise self.ESTABLISHED().action_parameters(pkt)
+#     @ATMT.action(synack_received)
+#     def send_ack_of_synack(self, pkt):
+#         print "SYN_SENT: action: send ack"
+#         self.l4[TCP].ack = pkt[TCP].seq + 1
+#         self.l4[TCP].flags = "A"
+#         self.send(self.l4)
+# 
+#     @ATMT.receive_condition(ESTABLISHED)
+#     def incoming_data_received(self, pkt):
+#         print "EST: cond: incoming data?"
+#         print pkt.summary()
+#         if not isinstance(pkt[TCP].payload, NoPayload) and not isinstance(pkt[TCP].payload, conf.padding_layer):
+# #             print "TCP flags: ", pkt[TCP].flags
+# #             if pkt[TCP].flags & 0x4: # RST
+# #                 print "ESTABLISHED: RST received... did you update iptables?"
+# #                 raise self.CLOSED().action_parameters(pkt)
+#              
+#             # else ok
+#             raise self.ESTABLISHED().action_parameters(pkt)
+    @ATMT.action(TCP_client.incoming_data_received)
     def receive_data(self, pkt):
         print "EST: action: receive data"
 
@@ -140,45 +143,45 @@ class myTCP_client(Automaton):
         else:
             print " - recv: no data or bad ack/seq"
     
-    @ATMT.ioevent(ESTABLISHED, name="tcp", as_supersocket="tcplink")
-    def outgoing_data_received(self, fd):
-        print "EST: event: outgoing data"
-        raise self.ESTABLISHED().action_parameters(fd.recv())
-    @ATMT.action(outgoing_data_received)
-    def send_data(self, d):
-        print "EST: action: send data: ", self.l4.summary()
-        self.l4[TCP].flags = "PA"
-        self.send(self.l4 / d)
-        self.l4[TCP].seq += len(d)
-            
-    @ATMT.receive_condition(ESTABLISHED)
-    def reset_received(self, pkt):
-        print "EST: cond: rst?"
-        print pkt.summary()
-        if pkt[TCP].flags & 4 != 0:
-            raise self.CLOSED()
-
-    @ATMT.receive_condition(ESTABLISHED)
-    def fin_received(self, pkt):
-        print "EST: cond: fin?"
-        print pkt.summary()
-        if pkt[TCP].flags & 0x1 == 1:
-            raise self.LAST_ACK().action_parameters(pkt)
-    @ATMT.action(fin_received)
-    def send_finack(self, pkt):
-        print "EST: action: send finack"
-        self.l4[TCP].flags = "FA"
-        self.l4[TCP].ack = pkt[TCP].seq + 1
-        self.send(self.l4)
-        self.l4[TCP].seq += 1
-
-    @ATMT.receive_condition(LAST_ACK)
-    def ack_of_fin_received(self, pkt):
-        print "LAST_ACK: cond: ack of fin?"
-        print pkt
-        print pkt.summary()
-        if pkt[TCP].flags & 0x3f == 0x10:
-            raise self.CLOSED()
+#     @ATMT.ioevent(TCP_client.ESTABLISHED, name="tcp", as_supersocket="tcplink")
+#     def outgoing_data_received(self, fd):
+#         print "EST: event: outgoing data"
+#         raise self.ESTABLISHED().action_parameters(fd.recv())
+#     @ATMT.action(outgoing_data_received)
+#     def send_data(self, d):
+#         print "EST: action: send data: ", self.l4.summary()
+#         self.l4[TCP].flags = "PA"
+#         self.send(self.l4 / d)
+#         self.l4[TCP].seq += len(d)
+#             
+#     @ATMT.receive_condition(ESTABLISHED)
+#     def reset_received(self, pkt):
+#         print "EST: cond: rst?"
+#         print pkt.summary()
+#         if pkt[TCP].flags & 4 != 0:
+#             raise self.CLOSED()
+# 
+#     @ATMT.receive_condition(ESTABLISHED)
+#     def fin_received(self, pkt):
+#         print "EST: cond: fin?"
+#         print pkt.summary()
+#         if pkt[TCP].flags & 0x1 == 1:
+#             raise self.LAST_ACK().action_parameters(pkt)
+#     @ATMT.action(fin_received)
+#     def send_finack(self, pkt):
+#         print "EST: action: send finack"
+#         self.l4[TCP].flags = "FA"
+#         self.l4[TCP].ack = pkt[TCP].seq + 1
+#         self.send(self.l4)
+#         self.l4[TCP].seq += 1
+# 
+#     @ATMT.receive_condition(LAST_ACK)
+#     def ack_of_fin_received(self, pkt):
+#         print "LAST_ACK: cond: ack of fin?"
+#         print pkt
+#         print pkt.summary()
+#         if pkt[TCP].flags & 0x3f == 0x10:
+#             raise self.CLOSED()
 
     # --- zerowindow stuff
     pkgcount = 0
@@ -207,16 +210,16 @@ class myTCP_client(Automaton):
             raise self.CLOSED().action_parameters(pkt)
 
     # when entering the ESTABLISHED state, send a packet.
-    @ATMT.condition(ESTABLISHED)
+    @ATMT.condition(TCP_client.ESTABLISHED)
     def OnEstablished(self):
-        print "EST: cond: sending request"
+        print "Connection established"
         print " - send request: >%s<" % self.request
         self.l4[TCP].flags = "PA"
         self.send(self.l4 / self.request)
         self.l4[TCP].seq += len(self.request)
 
     # when ESTABLISHED, any packet recevied triggers a transition to RECEIVE_N    
-    @ATMT.receive_condition(ESTABLISHED)
+    @ATMT.receive_condition(TCP_client.ESTABLISHED)
     def first_pkg_received(self, pkt):
         ''' When in ESTABLISHED or in RECEIVE_N, next packages changes state to ReceiveN'''
         print "EST: cond: first pkg received?"
