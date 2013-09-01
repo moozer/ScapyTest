@@ -11,6 +11,8 @@
 
 from scapy.all import *
 from scapy.layers.inet import TCP_client, TCP
+#from scapy.automaton import ATMT
+#from scapy.packet import Raw
 
 
 #############################
@@ -63,6 +65,7 @@ class ZeroWindow_TCP_client(TCP_client):
     @ATMT.state()
     def RECEIVE_N(self):
         print "RECEIVE_N"
+        print "- if it hangs here, perhaps you need to fix the iptables"
         pass
 
     @ATMT.state()
@@ -105,6 +108,20 @@ class ZeroWindow_TCP_client(TCP_client):
         print " - current count", self.pkgcount
 
     # when RECEIVE_N, we count the packages and ACK correctly.
+    @ATMT.receive_condition(RECEIVE_N)
+    def pkg_received(self, pkt):
+        ''' When in ESTABLISHED or in RECEIVE_N, next packages changes state to ReceiveN'''
+        print "RECEIVE_N: cond: pkg received? (%d > %d?)"%(self.pkgcount, self.maxpkgcount)
+        if self.pkgcount <= self.maxpkgcount:
+            raise self.RECEIVE_N().action_parameters(pkt)        
+    @ATMT.action(pkg_received)    
+    def count_received_data(self, pkt):
+        print "RECEIVE_N: action: counting"
+        print " - fake EST following this line :-)"
+        self.receive_data( pkt )
+        self.pkgcount += 1
+                   
+    # when RECEIVE_N, we count the packages and ACK correctly.
     # after n packets, we change to SEND_ZEROWINDOW
     @ATMT.receive_condition(RECEIVE_N)
     def pkg_count_exceeded(self, pkt):
@@ -112,15 +129,14 @@ class ZeroWindow_TCP_client(TCP_client):
         print "RECEIVE_N: cond: pkg count exceeded? (%d > %d?)"%(self.pkgcount, self.maxpkgcount)
         if self.pkgcount > self.maxpkgcount:
             raise self.SEND_ZEROWINDOW().action_parameters(pkt)
-        else:
-            raise self.RECEIVE_N().action_parameters(pkt)        
     @ATMT.action(pkg_count_exceeded)    
-    def count_received_data(self, pkt):
-        print "RECEIVE_N: action: counting"
+    def receive_excess_data(self, pkt):
+        print "RECEIVE_N: action: receive_excess_data"
         print " - fake EST following this line :-)"
         self.receive_data( pkt )
         self.pkgcount += 1
-                   
+        self.zwcount = 0
+
     # when in SEND_ZEROWINDOW, and packets received trigger an ACK with zero window (forever)
     @ATMT.receive_condition(SEND_ZEROWINDOW)
     def pkg_received_zw(self, pkt):
@@ -132,6 +148,7 @@ class ZeroWindow_TCP_client(TCP_client):
     def send_zw(self, pkt):
         print "SEND_ZEROWINDOW: action: send zerowindow pkg"
         self.zwcount += 1
+        self.pkgcount += 1
         print " - count:", self.zwcount
         
         data = str(pkt[TCP][Raw].load)
@@ -162,7 +179,7 @@ ServerPort = 80
 ServerFile = "/debian-cd/7.1.0/amd64/iso-cd/debian-7.1.0-amd64-netinst.iso"
 
 # include this if you want an overview of the state machine.
-ZeroWindow_TCP_client.graph()
+#ZeroWindow_TCP_client.graph()
 
 s = ZeroWindow_TCP_client( ServerName, ServerPort, "GET %s HTTP/1.0\n\n" % ServerFile, debug=5)
 s.run()
